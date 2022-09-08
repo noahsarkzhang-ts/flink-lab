@@ -20,6 +20,7 @@ package org.noahsark;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
@@ -38,36 +39,23 @@ import org.apache.flink.util.Collector;
  * <p>If you change the name of the main class (with the public static void main(String[] args))
  * method, change the respective entry in the POM.xml file (simply search for 'mainClass').
  */
-public class DataStreamJob {
+public class HelloWorldStreamJob {
 
     public static void main(String[] args) throws Exception {
         // Sets up the execution environment, which is the main entry point
         // to building Flink applications.
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        /*
-         * Here, you can start creating your execution plan for Flink.
-         *
-         * Start with getting some data from the environment, like
-         * 	env.fromSequence(1, 10);
-         *
-         * then, transform the resulting DataStream<Long> using operations
-         * like
-         * 	.filter()
-         * 	.flatMap()
-         * 	.window()
-         * 	.process()
-         *
-         * and many more.
-         * Have a look at the programming guide:
-         *
-         * https://nightlies.apache.org/flink/flink-docs-stable/
-         *
-         */
+        // 用parameter tool工具从程序启动参数中提取配置项，如 --host 192.168.1.1 --port 9000
+        // 使用 nc -lk 9000 监听请求并发送数据
+        final ParameterTool parameterTool = ParameterTool.fromArgs(args);
+        String host = parameterTool.get("host");
+        int port = parameterTool.getInt("port");
 
-        // env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
+        // 时间语义为处理时间
         env.getConfig().setAutoWatermarkInterval(0L);
-        DataStream<String> text = env.socketTextStream("192.168.7.115", 9000, "\n");
+
+        DataStream<String> text = env.socketTextStream(host, port, "\n");
 
         DataStream<Tuple2<String, Integer>> wordCounts = text
                 .flatMap(new FlatMapFunction<String, Tuple2<String, Integer>>() {
@@ -87,6 +75,6 @@ public class DataStreamJob {
         windowCounts.print().setParallelism(1);
 
         // Execute program, beginning computation.
-        env.execute("Flink Java API Skeleton");
+        env.execute("Hello World Job");
     }
 }

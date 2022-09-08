@@ -11,6 +11,7 @@
         <module>flink-hello-world</module>
         <module>flink-training</module>
         <module>flink-frauddetection</module>
+        <module>flink-window-training</module>
     </modules>
     <packaging>pom</packaging>
 

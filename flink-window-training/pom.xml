@@ -25,10 +25,10 @@ under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-hello-world</artifactId>
+    <artifactId>flink-window-training</artifactId>
     <packaging>jar</packaging>
 
-    <name>flink-hello-world</name>
+    <name>Flink Window Training</name>
 
     <dependencies>
         <!-- Apache Flink dependencies -->
@@ -59,7 +59,7 @@ under the License.
     </dependencies>
 
     <build>
-        <finalName>hello-count</finalName>
+        <finalName>window-training</finalName>
         <plugins>
 
             <!-- Java Compiler -->
