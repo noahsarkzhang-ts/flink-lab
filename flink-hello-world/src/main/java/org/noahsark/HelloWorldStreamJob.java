@@ -42,8 +42,8 @@ import org.apache.flink.util.Collector;
 public class HelloWorldStreamJob {
 
     public static void main(String[] args) throws Exception {
-        // Sets up the execution environment, which is the main entry point
-        // to building Flink applications.
+
+        // 设置流环境
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
         // 用parameter tool工具从程序启动参数中提取配置项，如 --host 192.168.1.1 --port 9000
@@ -52,11 +52,13 @@ public class HelloWorldStreamJob {
         String host = parameterTool.get("host");
         int port = parameterTool.getInt("port");
 
-        // 时间语义为处理时间
+        // 时间语义为处理时间（事件处理的时间）
         env.getConfig().setAutoWatermarkInterval(0L);
 
+        // 从 TCP 文本流中读取数据
         DataStream<String> text = env.socketTextStream(host, port, "\n");
 
+        // 将字符串按照空格分隔，得到二元组 <world, 1>, 第一个元素为单词，第二个元素为数字1，表示单词的数量
         DataStream<Tuple2<String, Integer>> wordCounts = text
                 .flatMap(new FlatMapFunction<String, Tuple2<String, Integer>>() {
                     @Override
@@ -67,14 +69,16 @@ public class HelloWorldStreamJob {
                     }
                 });
 
+        // 将二元组按照第一个元素，即单词分组，然后按照时间进行分桶，统计每 15S 单词出现的次数
         DataStream<Tuple2<String, Integer>> windowCounts = wordCounts
                 .keyBy(tuple -> tuple.f0)
                 .window(TumblingProcessingTimeWindows.of(Time.seconds(10)))
                 .sum(1);
 
+        // 设置并行度为1(方便测试)
         windowCounts.print().setParallelism(1);
 
-        // Execute program, beginning computation.
+        // 定义任务名称并启动任务.
         env.execute("Hello World Job");
     }
 }

@@ -17,7 +17,9 @@ import java.util.concurrent.TimeUnit;
  **/
 public class MySensorSource implements SourceFunction<SensorReading> {
 
-    // 定义一个标识位，用来控制数据的产生
+    /**
+     * 定义一个标识位，用来控制数据的产生
+     */
     private boolean running = true;
 
     // 设置10个传感器的初始温度
