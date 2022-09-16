@@ -1,0 +1,44 @@
+sensor_1,1663041358,35.8
+sensor_2,1663041360,15.4
+sensor_1,1663041361,24.0
+sensor_1,1663041362,20.5
+
+
+sensor_1,1663041280,24.0
+
+sensor_2,1663041361,15.4
+sensor_2,1663041362,20.4
+
+minTemp-reduce-process> (sensor_1,1663041345000,1663041360000,SensorReading{id='sensor_1', timestamp=1663041358, temperature=35.8})
+minTemp-reduce-process> (sensor_1,1663041345000,1663041360000,SensorReading{id='sensor_1', timestamp=1663041358, temperature=35.8})
+minTemp-reduce-process> (sensor_1,1663041300000,1663041315000,SensorReading{id='sensor_1', timestamp=1663041300, temperature=24.0})
+late> SensorReading{id='sensor_1', timestamp=1663041280, temperature=24.0}
+
+时间戳：
+1663041358
+
+窗口：
+1663041345000,1663041360000
+
+watermark:
+1663041359999
+
+60S 延迟：
+1663041300
+
+延迟数据：
+1663041299
+
+sensor_1,1663041300,24.0
+sensor_1,1663041299,24.0
+
+minTemp-reduce-process> (sensor_1,1663041345000,1663041360000,1663041359999,SensorReading{id='sensor_1', timestamp=1663041358, temperature=35.8})
+
+sensor_1,1663041370,20.5
+sensor_1,1663041375,20.5
+sensor_1,1663041376,20.5
+sensor_1,1663041377,20.5
+
+sensor_1,1663041392,19.5
+
+sensor_1,1663041329,19.5

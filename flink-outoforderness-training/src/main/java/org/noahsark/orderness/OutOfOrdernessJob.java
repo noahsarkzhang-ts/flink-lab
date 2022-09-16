@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package org.noahsark.window;
+package org.noahsark.orderness;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.ReduceFunction;
-import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.api.java.tuple.Tuple5;
+import org.apache.flink.api.java.utils.ParameterTool;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.datastream.WindowedStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -30,8 +31,10 @@ import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindo
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
-import org.noahsark.window.beans.SensorReading;
-import org.noahsark.window.common.MySensorSource;
+import org.apache.flink.util.OutputTag;
+import org.noahsark.orderness.beans.SensorReading;
+
+import java.time.Duration;
 
 /**
  * Skeleton for a Flink DataStream Job.
@@ -45,58 +48,72 @@ import org.noahsark.window.common.MySensorSource;
  * <p>If you change the name of the main class (with the public static void main(String[] args))
  * method, change the respective entry in the POM.xml file (simply search for 'mainClass').
  */
-public class FlinkWindowTrainingJob {
+public class OutOfOrdernessJob {
 
     public static void main(String[] args) throws Exception {
         // Sets up the execution environment, which is the main entry point
         // to building Flink applications.
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        // 设置事件时间语义
+        // 设置 Watermark 生成间隔为 200MS
         env.getConfig().setAutoWatermarkInterval(200L);
+
+        // 设置并行度为 1
         env.setParallelism(1);
 
-        // 1. 设置 Source
-        DataStream<SensorReading> dataStream = env.addSource(new MySensorSource());
+        // 用parameter tool工具从程序启动参数中提取配置项，如 --host 192.168.1.1 --port 9000
+        // 使用 nc -lk 9000 监听请求并发送数据
+        final ParameterTool parameterTool = ParameterTool.fromArgs(args);
+        String host = parameterTool.get("host");
+        int port = parameterTool.getInt("port");
 
-        // 2. 定义 WatermarkStrategy
-        WatermarkStrategy<SensorReading> watermarkStrategy = WatermarkStrategy.<SensorReading>forMonotonousTimestamps()
-                .withTimestampAssigner((event, timestamp) -> event.getTimestamp());
+        // 获取 socket 文本流
+        final DataStreamSource<String> dataStreamSource = env.socketTextStream(host, port);
 
+        // 转换数据格式
+        final SingleOutputStreamOperator<SensorReading> dataStream = dataStreamSource.map(line -> {
+            String[] fields = line.split(",");
+
+            return new SensorReading(fields[0], Long.parseLong(fields[1]), Double.parseDouble(fields[2]));
+        });
+
+        // 定义 watermarkStrategy
+        final WatermarkStrategy<SensorReading> watermarkStrategy = WatermarkStrategy
+                .<SensorReading>forBoundedOutOfOrderness(Duration.ofSeconds(2))
+                .withTimestampAssigner((event, timestamp) -> event.getTimestamp() * 1000);
         final SingleOutputStreamOperator<SensorReading> eventDataStream = dataStream.assignTimestampsAndWatermarks(watermarkStrategy);
 
-        // 3. 使用滚动事件窗口，窗口大小为 5S
-        WindowedStream<SensorReading, String, TimeWindow> windowStream = eventDataStream.keyBy(sensorReading -> sensorReading.getId())
-                .window(TumblingEventTimeWindows.of(Time.seconds(5)));
 
-        // 4. 使用 ReduceFunction 求最小值
-        final SingleOutputStreamOperator<SensorReading> minTempStream = windowStream
-                .reduce(new MyReduceFunction());
+        // 分组，开窗及处理迟到数据
+        OutputTag<SensorReading> outputTag = new OutputTag<SensorReading>("late") {
+        };
+        final WindowedStream<SensorReading, String, TimeWindow> windowStream = eventDataStream.keyBy(sensorReading -> sensorReading.getId())
+                .window(TumblingEventTimeWindows.of(Time.seconds(15)))
+                .allowedLateness(Time.minutes(1))
+                .sideOutputLateData(outputTag);
 
-        // 5. 输出 ReduceFunction 最小值
-        minTempStream.print("minTemp-reduce");
-
-        // 6. 使用 ReduceFunction + ProcessWindowFunction 求最小值
-        SingleOutputStreamOperator<Tuple3<String, Long, SensorReading>> reduceProcessWindow = windowStream.reduce(
+        // 使用 ReduceFunction + ProcessWindowFunction 求最小值
+        SingleOutputStreamOperator<Tuple5<String, Long, Long, Long, SensorReading>> reduceProcessWindow = windowStream.reduce(
                 new MyReduceFunction(), new MyProcessWindowFunction());
 
-        // 7. 输出 ReduceFunction + ProcessWindowFunction 最小值，输出格式为<key,timestamp,minValue>
+        // 输出 ReduceFunction + ProcessWindowFunction 最小值，输出格式为<key,winStart,winEnd,minValue>
         reduceProcessWindow.print("minTemp-reduce-process");
+        reduceProcessWindow.getSideOutput(outputTag).print("late");
 
-        // 8. 执行程序
-        env.execute("Flink Window Training");
+        // Execute program, beginning computation.
+        env.execute("Flink OutOfOrderness Job");
     }
 
     private static class MyProcessWindowFunction
-            extends ProcessWindowFunction<SensorReading, Tuple3<String, Long, SensorReading>, String, TimeWindow> {
+            extends ProcessWindowFunction<SensorReading, Tuple5<String, Long, Long, Long, SensorReading>, String, TimeWindow> {
 
         @Override
         public void process(String key,
                             Context context,
                             Iterable<SensorReading> minReadings,
-                            Collector<Tuple3<String, Long, SensorReading>> out) {
+                            Collector<Tuple5<String, Long, Long, Long, SensorReading>> out) {
             SensorReading min = minReadings.iterator().next();
-            out.collect(new Tuple3<>(key, context.window().getStart(), min));
+            out.collect(new Tuple5<>(key, context.window().getStart(), context.window().getEnd(), context.currentWatermark(), min));
         }
     }
 
@@ -108,5 +125,4 @@ public class FlinkWindowTrainingJob {
             return sensorReading;
         }
     }
-
 }

@@ -12,6 +12,9 @@
         <module>flink-training</module>
         <module>flink-frauddetection</module>
         <module>flink-window-training</module>
+        <module>flink-outoforderness-training</module>
+        <module>flink-processfunction-training</module>
+        <module>flink-join-training</module>
     </modules>
     <packaging>pom</packaging>
 

@@ -128,6 +128,7 @@ public class TaxiRide implements Comparable<TaxiRide>, Serializable {
      *   <li>putting START events before END events if they have the same timestamp
      * </ul>
      */
+    @Override
     public int compareTo(@Nullable TaxiRide other) {
         if (other == null) {
             return 1;
