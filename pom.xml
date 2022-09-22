@@ -15,6 +15,7 @@
         <module>flink-outoforderness-training</module>
         <module>flink-processfunction-training</module>
         <module>flink-join-training</module>
+        <module>flink-topn-training</module>
     </modules>
     <packaging>pom</packaging>
 
