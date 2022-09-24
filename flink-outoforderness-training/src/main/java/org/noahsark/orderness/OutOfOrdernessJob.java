@@ -81,6 +81,7 @@ public class OutOfOrdernessJob {
         final WatermarkStrategy<SensorReading> watermarkStrategy = WatermarkStrategy
                 .<SensorReading>forBoundedOutOfOrderness(Duration.ofSeconds(2))
                 .withTimestampAssigner((event, timestamp) -> event.getTimestamp() * 1000);
+
         final SingleOutputStreamOperator<SensorReading> eventDataStream = dataStream.assignTimestampsAndWatermarks(watermarkStrategy);
 
 

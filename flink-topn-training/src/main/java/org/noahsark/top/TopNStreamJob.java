@@ -104,6 +104,7 @@ public class TopNStreamJob {
         // 使用 AggrgationFunction + ProcessWindowFunction 求平均值
         SingleOutputStreamOperator<TopSensor> avgProcessWindow = windowStream.aggregate(new MyAggrgationFunction(), new MyProcessWindowFunction());
 
+        // 按照 windowEnd 进行分组，将相同窗口内的传感器进行排序，将输出 topN.
         final SingleOutputStreamOperator<String> topStream = avgProcessWindow.keyBy(topSensor -> topSensor.getWinEnd()).process(new TopSensorKeyedProcessFunction());
 
         // 输出迟到数据
@@ -116,6 +117,9 @@ public class TopNStreamJob {
         env.execute("Flink TopN Job");
     }
 
+    /**
+     * 构造 TopSensor 类，获取窗口值
+     */
     private static class MyProcessWindowFunction
             extends ProcessWindowFunction<Double, TopSensor, String, TimeWindow> {
 
@@ -130,6 +134,9 @@ public class TopNStreamJob {
         }
     }
 
+    /**
+     * AggregateFunction, 增量计算平均值
+     */
     private static class MyAggrgationFunction implements AggregateFunction<SensorReading, AvgValue, Double> {
 
         @Override
@@ -156,8 +163,15 @@ public class TopNStreamJob {
         }
     }
 
+    /**
+     * 计算 TopN 值
+     * 1. 使用状态变量存储传感器平均值；
+     * 2. 使用定时器触发计算，触发器时间为：windowEnd + 1, 比当前窗口大 1 MS,
+     *  从而保证所有的传感器数据已经加入到状态列表中。
+     */
     private static class TopSensorKeyedProcessFunction extends KeyedProcessFunction<Long, TopSensor, String> {
 
+        // 状态变量，存储传感器列表。
         private ListState<TopSensor> sensorList;
 
         @Override
